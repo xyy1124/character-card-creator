@@ -302,6 +302,7 @@ New-Item -ItemType Directory -Path "cards/<角色名>" -Force
 
 #### data.system_prompt（系统指令 ← AI 的行为规则引擎）
 这是**直接指导 AI 如何扮演角色的最详细规则**。AI 会将此字段作为系统级指令执行。
+> **⚠️ 客户端差异**：部分客户端（如 LnnLore）当前保留但**不入模**该字段（不映射预设 Main）——依赖客户端生效的核心行为规则必须同时写入实际入模字段（description / personality / scenario / post_history_instructions 兼容载荷）；system_prompt 作为 ST/RisuAI 等客户端的标准字段保留完整内容。
 必须包含以下子内容（用标题分隔）：
 - **语言风格**：角色如何说话——自称、语气、句式、用词偏好、不同情绪下的语言变化。
 - **知识范围**：角色知道什么、不知道什么。遇到知识空白时如何处理。
@@ -798,6 +799,8 @@ SillyTavern 独立世界书 JSON 格式：
 ### 1. 状态栏 ST 兼容方案（三件套 + HTML 面板）
 
 > **三件套** = 变量宏 + 正则 + Quick Replies（ST 原生机制）；HTML 面板是独立展示层（由运行时按变量渲染）。变量更新者：ST 模式下由模型依据卡内「状态变化规则」在剧情中自主输出 `{{setvar}}` 宏（卡内不写"必须输出宏"指令，但保留变化规则供模型执行）；App 模式下由 tracker 运行时解析 JSON patch 写入。StatusFallback 仅是未更新时的显示兜底，不是写入者。
+>
+> **⚠️ 客户端能力边界**：三件套为 SillyTavern 兼容方案——部分客户端（如 LnnLore）不支持导入 ST QuickReplies 文件（无 `/popup` `/echo` `/deletevar` 命令解释器）、跳过含 `{{` 的 StatusFallback 正则、只识别字符串 placement（数组 `[6]`/`[2]` 回退 `ai_output`）；这些能力仅作为 ST 兼容交付要求保留，不得声称是各客户端的运行时能力。
 
 > **背景**：ST 平台没有 App 的 tracker 运行时，需要三件套实现状态持久化与显示。LnnLore App 模式下，setvar/面板输出指令由 App 注入时剥离（模型不输出宏，状态走 JSON 协议）——但卡侧仍提供三件套，保证卡在 ST 平台也能用。
 
@@ -836,7 +839,7 @@ SillyTavern 独立世界书 JSON 格式：
 - `schemaVersion: "1.0"`
 - `stateSchema`：状态字段定义（`{key: {type: number|string, label, min?, max?, presentation}}`，字段与三件套变量 key 完全一致，≥3 个）
 - `initialState`：初始值（如好感度 20/当前阶段 1 层）
-- `actions`：决策动作（≥2 个，`{id, label, prompt}`——查看状态/重置状态 + 1 个玩法动作，如「加深好感」「推进阶段」）
+- `actions`：决策动作（≥2 个，`{id, label, prompt}`——查看状态/重置状态 + 1 个玩法动作，如「加深好感」「推进阶段」）。**⚠️ 部分客户端（如 LnnLore）仅解析保留、未消费 actions**（真正可点按钮来自模型动态 `choices` 输出）；actions 作为 ST/未来兼容声明保留。
 - `uiHints`：`{order: [字段key…]}`（**必须存在且与 stateSchema key 集合一致**；`template` 放 tracker 顶层，`uiHints.template` 仍兼容读取但不再推荐）
 - `template`（**强制**）：自定义面板 HTML 模板（与 `post_history_instructions` 的 `<!--panel-->` 模板内容一致，App 渲染用），缺失时 App 只能用内置兜底样式、丢失卡自定义面板
 - `defaultExpanded`（可选）：状态面板初始是否展开（不声明默认收起，用户手动偏好优先）
@@ -1012,7 +1015,7 @@ SillyTavern 独立世界书 JSON 格式：
 如果角色卡面向启用强制思维链的 App（如 LnnLore），`mes_example` 每组示例中 `{{char}}:` 之后、正文之前可带一组 `<think>...</think>` 思考示范，按以下框架（不得合并、跳过或简化）：
 
 1. **前文文风与格式分析**——人称 / 语言风格 / 描写密度 / 节奏特点
-2. **状态栏变化**——角色卡是否要求状态面板 / 当前应更新的项目 / 预测更新后的状态栏内容（数值与剧情一致）
+2. **状态变化判断**——本轮剧情引发的状态变化（哪些字段会变、变多少；**不在思考中示范面板输出**——面板由客户端渲染）
 3. **人物关系**——出场人物 / 身份与关系
 4. **姿势与动作**——当前各人物姿势与动作 / 预测下一步自然动作
 5. **场景分析**——时间 / 地点 / 在场人物 / 当前氛围
