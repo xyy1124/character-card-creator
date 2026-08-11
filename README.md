@@ -10,6 +10,7 @@
 
 - 引导式问答完善角色设定（角色定位 / 世界观 / 关系 / 场景）
 - **工作流总控（Agent 协议）**：模式判定（create/modify/restore/imitate）、验收 profile、run.json 运行状态、候选文件 + 脚本验证才提升、有界返工循环、子智能体限定审查
+- **执行工具 `scripts/card_agent.js`**：init/record/verify/promote/report 五子命令，run.json 状态管理 + 验证门禁（JSON 合法性 / tracker v76/v77 / PHI v71 / 内部引用泄漏）+ 候选提升全自动
 - 输出合法 Chara Card V2 JSON（`spec: "chara_card_v2"`）
 - 配套世界书（Lorebook）设计与双格式输出（CCv2 内嵌 + SillyTavern 原生格式）
 - 世界书优先级与调度方法论（order / position / 触发词 / 预算截断）
@@ -23,7 +24,8 @@
 character-card-creator/
 ├── SKILL.md                              ← 技能主体（ZCode 技能格式）
 ├── scripts/
-│   └── verify_tracker_v76_v77.js         ← tracker 公共验证器（v76/v77 协议）
+│   ├── card_agent.js                     ← 工作流执行工具（init/record/verify/promote/report）
+│   └── verify_tracker_v76_v77.js         ← tracker 公共验证器（v76/v77 协议，含 CLI 门禁）
 ├── README.md
 └── LICENSE
 ```
