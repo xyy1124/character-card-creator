@@ -1,8 +1,11 @@
 // verify_tracker_v76_v77.js — Tracker v76/v77 协议公共验证器（唯一权威实现）
 // 所有生成脚本（写盘前）与验证脚本（读盘后）必须调用本模块，禁止各自实现规则
-// 用法:
-//   const { verifyTrackerV76V77 } = require('../lib/verify_tracker_v76_v77');
+// 模块用法（仓库根目录）:
+//   const { verifyTrackerV76V77 } = require('./scripts/verify_tracker_v76_v77');
 //   verifyTrackerV76V77(card, { storyTermsByField, throwOnError: false });
+// CLI 用法（0.6 候选提升门禁）:
+//   node scripts/verify_tracker_v76_v77.js <角色卡.json> [--story-terms key=词1,词2 ...]
+//   退出码: 0=通过 / 1=验证失败 / 2=用法错误或文件不可读
 "use strict";
 
 function verifyTrackerV76V77(card, options = {}) {
@@ -35,7 +38,7 @@ function verifyTrackerV76V77(card, options = {}) {
   const initial = plain(tracker?.initialState) ? tracker.initialState : {};
   const initialKeys = Object.keys(initial);
 
-  requireRule(fieldKeys.length > 0, "tracker.stateSchema", "至少声明一个字段");
+  requireRule(fieldKeys.length >= 3, "tracker.stateSchema", "至少声明 3 个字段（v76 标准）");
   requireRule(
     exactKeySet(initialKeys, fieldKeys),
     "tracker.initialState",
@@ -77,9 +80,9 @@ function verifyTrackerV76V77(card, options = {}) {
 
       const ranges = field.presentation?.ranges;
       requireRule(
-        Array.isArray(ranges) && ranges.length > 0,
+        Array.isArray(ranges) && ranges.length >= 3,
         `${path}.presentation.ranges`,
-        "number 字段必须声明非空 ranges"
+        "number 字段必须声明至少 3 段 ranges（v76 标准）"
       );
       for (const [index, range] of (Array.isArray(ranges) ? ranges : []).entries()) {
         const rangePath = `${path}.presentation.ranges[${index}]`;
@@ -189,9 +192,9 @@ function verifyTrackerV76V77(card, options = {}) {
       );
       const states = field.presentation?.states;
       requireRule(
-        plain(states) && Object.keys(states).length > 0,
+        plain(states) && Object.keys(states).length >= 2,
         `${path}.presentation.states`,
-        "必须为非空对象"
+        "必须声明至少 2 个枚举（v76 标准）"
       );
 
       for (const [stateKey, state] of Object.entries(plain(states) ? states : {})) {
@@ -236,9 +239,9 @@ function verifyTrackerV76V77(card, options = {}) {
   }
 
   requireRule(
-    Array.isArray(tracker?.actions) && tracker.actions.length > 0,
+    Array.isArray(tracker?.actions) && tracker.actions.length >= 2,
     "tracker.actions",
-    "必须为非空数组"
+    "必须声明至少 2 个动作（查看状态/重置状态 + 玩法动作，v76 标准）"
   );
 
   const order = tracker?.uiHints?.order;
@@ -321,3 +324,34 @@ function verifyTrackerV76V77(card, options = {}) {
 }
 
 module.exports = { verifyTrackerV76V77 };
+
+// CLI 入口（0.6 候选提升门禁用）：直接运行本文件时读取角色卡 JSON 并验证
+if (require.main === module) {
+  const fs = require('fs');
+  const args = process.argv.slice(2);
+  const cardPath = args.find((a) => !a.startsWith('--'));
+  if (!cardPath) {
+    console.error('用法: node scripts/verify_tracker_v76_v77.js <角色卡.json> [--story-terms key=词1,词2 ...]');
+    process.exit(2);
+  }
+  const storyTermsByField = {};
+  for (const arg of args) {
+    const m = /^--story-terms=([^=]+)=(.+)$/.exec(arg);
+    if (m) storyTermsByField[m[1].trim()] = m[2].split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  let card;
+  try {
+    card = JSON.parse(fs.readFileSync(cardPath, 'utf8'));
+  } catch (e) {
+    console.error(`无法读取/解析角色卡 ${cardPath}: ${e.message}`);
+    process.exit(2);
+  }
+  const result = verifyTrackerV76V77(card, { storyTermsByField, throwOnError: false });
+  if (result.ok) {
+    console.log('✓ Tracker v76/v77 验证通过');
+    process.exit(0);
+  }
+  console.error(`✗ Tracker v76/v77 验证失败（${result.errors.length} 项）`);
+  for (const err of result.errors) console.error('  - ' + err);
+  process.exit(1);
+}
