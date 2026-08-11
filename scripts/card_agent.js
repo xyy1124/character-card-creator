@@ -79,6 +79,25 @@ const RUNTIME_FIELDS = [
 const LEAK_RE = /[0-9０-９]\s*[-－]\s*§/;
 // PHI v71：禁止"输出状态栏/面板"指令句
 const PHI_OUTPUT_RE = /输出\s*(?:HTML\s*)?(?:状态栏|状态面板|状态条)|(?:必须|每次|回复|末尾).{0,12}(?:输出).{0,8}(?:状态栏|状态面板|状态条|面板)/;
+// 全字段污染模式（模型可见字段中任何一处命中即 FAIL——App 剥离层不处理这些）
+const POLLUTION_RE = /必须输出状态面板|输出 HTML 状态面板|每次回复末尾(?:强制)?输出状态|输出状态栏|状态面板强制输出|角色卡是否要求状态面板|是否必须输出状态面板|更新面板|回复末尾完整输出状态面板|预测更新后的状态栏|状态栏必须与剧情一致|在 post_history_instructions 中更新面板/;
+// 模拟 App 剥离后 PHI 残留的面板样式（剥离后命中即 FAIL）
+const PHI_STRIP_RESIDUE_RE = /状态面板|状态栏|【|❤~|当前心理状态|【\{|【状态规则/;
+// 模拟 App stripPanelTemplates 剥离逻辑（按 tracker_runtime.dart:975-1102 实现）
+function stripAppPHI(phi) {
+  if (!phi) return '';
+  let s = phi
+    .replace(/<!--panel-->[\s\S]*?<!--\/panel-->/g, '')
+    .replace(/<details>[\s\S]*?<\/details>/g, '');
+  const keep = [];
+  for (const l of s.split('\n')) {
+    if (/setvar::/.test(l)) continue;
+    if (/状态栏三件套|强制输出规则/.test(l)) continue;
+    if (/(?:必须|需要|请|随后|每次|回复|末尾).{0,20}(?:输出|显示).{0,10}(?:状态栏|状态面板|面板|状态条)/.test(l)) continue;
+    keep.push(l);
+  }
+  return keep.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
 
 function checkJsonLegal(cardPath) {
   const errors = [];
@@ -153,6 +172,37 @@ function checkNumeric(cardPath) {
   return { warnings };
 }
 
+// 模拟 App 剥离后 PHI 必须干净（剥离层不处理纯文本状态段——2026-08-11 事故根因）
+function checkPhiStripped(cardPath) {
+  let card;
+  try { card = JSON.parse(fs.readFileSync(cardPath, 'utf8')); } catch { return { ok: true, errors: [], skipped: true }; }
+  if (!card?.data?.extensions?.tracker) return { ok: true, errors: [], skipped: true };
+  const phi = card?.data?.post_history_instructions || '';
+  const stripped = stripAppPHI(phi);
+  const errors = [];
+  const m = stripped.match(PHI_STRIP_RESIDUE_RE);
+  if (m) errors.push(`PHI 模拟 App 剥离后仍有面板样式残留: "${stripped.slice(0, 60)}"（纯文本状态段会被注入模型，导致正文输出状态栏）`);
+  return { ok: errors.length === 0, errors, skipped: false };
+}
+
+// 全字段污染扫描：模型可见字段不得含输出指令/面板模板（mes_example/system_prompt/description/世界书/actions）
+function checkFieldPollution(cardPath) {
+  let card;
+  try { card = JSON.parse(fs.readFileSync(cardPath, 'utf8')); } catch { return { ok: true, errors: [], skipped: true }; }
+  const errors = [];
+  const d = card.data || {};
+  const scan = (label, text) => {
+    if (typeof text !== 'string') return;
+    const m = text.match(POLLUTION_RE);
+    if (m) errors.push(`${label} 含面板输出指令: "${m[0].slice(0, 40)}"`);
+    if (/<details/.test(text)) errors.push(`${label} 含裸 <details> 面板（App 剥离层只处理 PHI 内/部分格式，其他字段会注入模型）`);
+  };
+  for (const f of ['description', 'personality', 'scenario', 'mes_example', 'system_prompt']) scan(f, d[f]);
+  if (Array.isArray(d.character_book?.entries)) d.character_book.entries.forEach((e, i) => scan(`worldbook[${i}]`, e.content));
+  for (const a of (d.extensions?.tracker?.actions || [])) scan('tracker.actions', a.prompt);
+  return { ok: errors.length === 0, errors, skipped: false };
+}
+
 // profile 必需文件（相对卡目录）
 const PROFILE_FILES = {
   basic: [],
@@ -190,6 +240,14 @@ function runVerify(name, opts) {
   // 3. PHI v71
   const p = checkPhiV71(cardPath);
   if (!p.ok) errors.push(...p.errors);
+
+  // 3.5 PHI 模拟 App 剥离后残留（2026-08-11 事故根因）
+  const ps = checkPhiStripped(cardPath);
+  if (!ps.ok) errors.push(...ps.errors);
+
+  // 3.6 全字段污染扫描（mes_example/system_prompt/世界书/actions）
+  const fp = checkFieldPollution(cardPath);
+  if (!fp.ok) errors.push(...fp.errors);
 
   // 4. 编号泄漏
   const l = checkLeak(cardPath);
