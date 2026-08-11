@@ -123,8 +123,11 @@ function checkLeak(cardPath) {
       const m = LEAK_RE.exec(line);
       if (!m) return;
       const trimmed = line.trim();
-      // 例外：system_prompt 防泄漏规则中的"禁止格式示例"列表行（如 "- 01-§、02-§、…"），技能文档明确属合法例外
-      if (label === 'system_prompt' && /^[-*]\s*[0-9０-９]{1,2}\s*[-－]\s*§/.test(trimmed)) return;
+      // 例外：system_prompt 防泄漏规则中的"禁止格式示例"（列表行如 "- 01-§、02-§、…"，或含"输出纯净规则/严禁在最终回复中输出/禁止格式"的规则段），技能文档明确属合法例外
+      if (label === 'system_prompt' && (
+        /^[-*]\s*[0-9０-９]{1,2}\s*[-－]\s*§/.test(trimmed) ||
+        /输出纯净规则|严禁在最终回复中输出|防泄漏|禁止格式|制作标记/.test(line)
+      )) return;
       errors.push(`编号泄漏 ${label}（第${i + 1}行）: "${trimmed.slice(0, 60)}"`);
     });
   };
