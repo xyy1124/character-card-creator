@@ -67,6 +67,7 @@ description: 角色卡全流程创建助手：引导问答、Chara Card V2 JSON 
 - 用户关键决定（选型/否决/补充设定）记录进 `user_decisions`
 - 验证失败的错误按 owner（哪个阶段/字段）记录进 `open_issues`，修复后移除
 - **主流程中断/子智能体失败后，从 run.json 恢复继续，不从头重来**
+- **run.json 一律由 `scripts/card_agent.js` 管理（见 0.9），禁止手写 run.json**
 
 ### 0.4 预检（工具调用前）
 
@@ -78,16 +79,38 @@ description: 角色卡全流程创建助手：引导问答、Chara Card V2 JSON 
 
 ### 0.6 候选文件 + 脚本验证才提升（强制）
 
-所有正式产物先写入 `_work/candidates/`；只有**实际执行验证脚本且退出码为 0、报告通过**（JSON.parse、`verify_tracker_v76_v77.js`、13 项清单、内部引用泄漏扫描等）后，才把候选文件提升（复制）为正式文件名。**禁止仅凭模型口头声称"已验证"即交付**。
+所有正式产物先写入 `_work/candidates/`；验证与提升**必须调用 `card_agent.js`**：
+- `verify <卡名> --candidate`：验证链 = JSON 合法性 + tracker v76/v77 门禁（公共验证器）+ PHI v71 输出指令检查 + 内部引用泄漏检查 + 数值化警告，按 run.json profile 校验必需文件
+- `promote <卡名>`：自动备份正式文件 → 候选提升 → 复验 → 更新 run.json；**候选未通过 verify 时拒绝提升**
+- **禁止仅凭模型口头声称"已验证"即交付**——以 `card_agent.js verify` 退出码 0 为准
 
 ### 0.7 有界返工循环
 
-验证失败 → 按错误定位 owner 与字段，只修失败项 → 重跑验证。同一错误**连续 2 次未消失**：停止盲目重试，重新分析根因（读脚本/查协议/换思路），必要时升级高智能子智能体分析。单阶段返工上限 3 轮。
+`card_agent.js verify` 失败 → 按输出错误定位 owner 与字段，只修失败项 → 重跑 verify。同一错误**连续 2 次未消失**：停止盲目重试，重新分析根因（读脚本/查协议/换思路），必要时升级高智能子智能体分析。单阶段返工上限 3 轮。
 
 ### 0.8 子智能体使用边界
 
 - 高价值任务的语义审查（核心字段矛盾/证据落地/验证器未覆盖项）交给子智能体做**限定范围**审查，不整包托管
 - 子智能体失败/超时不影响已落盘产物——从 run.json 检查点继续
+
+### 0.9 执行工具（强制，技能自带）
+
+工作流状态与验证一律使用本仓库自带 `scripts/card_agent.js`（与 `scripts/verify_tracker_v76_v77.js` 自包含）：
+
+```
+CARDS_ROOT=<角色卡根目录> node scripts/card_agent.js <子命令> <卡名> [选项]
+# 默认 CARDS_ROOT=./cards；实际工作区用环境变量指定
+```
+
+| 子命令 | 作用 |
+|---|---|
+| `init <卡名> --mode ... --features ... [--profile ...]` | 建 `_work/run.json` 骨架 + 预检（卡名/目录/模式合法性） |
+| `record <卡名> --decision "..." \| --artifact <路径> \| --issue-add "..." \| --issue-clear` | 记录用户决定/产物/遗留问题 |
+| `verify <卡名> [--candidate] [--story-terms=key=词1,词2 ...]` | 验证链：JSON 合法 + tracker v76/v77 + PHI v71 + 内部引用泄漏 + 数值化警告 + profile 必需文件；退出码 0/1 |
+| `promote <卡名> [--force]` | 备份 → 候选提升 → 复验 → 更新 run.json（未过 verify 拒绝） |
+| `report <卡名>` | 汇总状态（mode/features/profile/stage_status/open_issues/artifacts） |
+
+**硬性要求**：禁止手写 run.json；禁止跳过 verify 交付；promote 失败按 0.7 返工。
 
 ---
 
