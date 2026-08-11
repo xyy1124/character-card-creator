@@ -9,6 +9,7 @@
 ## 功能特性
 
 - 引导式问答完善角色设定（角色定位 / 世界观 / 关系 / 场景）
+- **工作流总控（Agent 协议）**：模式判定（create/modify/restore/imitate）、验收 profile、run.json 运行状态、候选文件 + 脚本验证才提升、有界返工循环、子智能体限定审查
 - 输出合法 Chara Card V2 JSON（`spec: "chara_card_v2"`）
 - 配套世界书（Lorebook）设计与双格式输出（CCv2 内嵌 + SillyTavern 原生格式）
 - 世界书优先级与调度方法论（order / position / 触发词 / 预算截断）
