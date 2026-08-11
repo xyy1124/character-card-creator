@@ -4,7 +4,7 @@
 //   const { verifyTrackerV76V77 } = require('./scripts/verify_tracker_v76_v77');
 //   verifyTrackerV76V77(card, { storyTermsByField, throwOnError: false });
 // CLI 用法（0.6 候选提升门禁）:
-//   node scripts/verify_tracker_v76_v77.js <角色卡.json> [--story-terms key=词1,词2 ...]
+//   node scripts/verify_tracker_v76_v77.js <角色卡.json> [--story-terms=key=词1,词2 ...]
 //   退出码: 0=通过 / 1=验证失败 / 2=用法错误或文件不可读
 "use strict";
 
@@ -331,7 +331,7 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const cardPath = args.find((a) => !a.startsWith('--'));
   if (!cardPath) {
-    console.error('用法: node scripts/verify_tracker_v76_v77.js <角色卡.json> [--story-terms key=词1,词2 ...]');
+    console.error('用法: node scripts/verify_tracker_v76_v77.js <角色卡.json> [--story-terms=key=词1,词2 ...]');
     process.exit(2);
   }
   const storyTermsByField = {};
