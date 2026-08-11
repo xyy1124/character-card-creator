@@ -80,7 +80,7 @@ description: 角色卡全流程创建助手：引导问答、Chara Card V2 JSON 
 ### 0.6 候选文件 + 脚本验证才提升（强制）
 
 所有正式产物先写入 `_work/candidates/`；验证与提升**必须调用 `card_agent.js`**：
-- `verify <卡名> --candidate`：验证链 = JSON 合法性 + tracker v76/v77 门禁（公共验证器）+ PHI v71 输出指令检查 + 内部引用泄漏检查 + 数值化警告，按 run.json profile 校验必需文件
+- `verify <卡名> --candidate`：验证链 = JSON 合法性 + tracker v76/v77 门禁（公共验证器）+ PHI v71 输出指令检查 + **PHI 模拟客户端剥离后残留检查**（剥离层只识别 panel 块/setvar/裸 details/指令句，普通状态文本段会注入模型——命中即 FAIL）+ **全字段污染扫描**（mes_example/system_prompt/description/世界书/actions 不得含面板输出指令或裸 `<details>`）+ 内部引用泄漏检查 + 数值化警告，按 run.json profile 校验必需文件
 - `promote <卡名>`：自动备份正式文件 → 候选提升 → 复验 → 更新 run.json；**候选未通过 verify 时拒绝提升**
 - **禁止仅凭模型口头声称"已验证"即交付**——以 `card_agent.js verify` 退出码 0 为准
 
@@ -313,7 +313,7 @@ New-Item -ItemType Directory -Path "cards/<角色名>" -Force
 
 #### data.post_history_instructions（后置历史指令）
 - 在对话历史之后注入的指令。用于需要放在对话末尾的内容。
-- 典型用途：存放状态更新规则与 ST 兼容的 `<!--panel-->...<!--/panel-->` 面板模板（模型不输出面板，面板由运行时按最终状态渲染），或执行固定的结算规则。
+- 典型用途：存放**可被客户端剥离的兼容载荷**——`{{setvar::}}` 变量更新行 + `<!--panel-->...<!--/panel-->` 面板模板块（运行时渲染用；注入模型前被剥离）+ 一句"状态数值必须与剧情实际进展一致"。**禁止**在 PHI 写任何普通文本状态段（字段说明/阶段表/称号体系/爱心装饰）——客户端剥离层只识别 panel 块/setvar 行/输出指令/裸 details，普通文本会原样注入模型，导致模型在正文输出状态栏。
 - 如果角色卡没有特殊需求，可以留空字符串 ""。
 - **安全要求**：此字段中的 HTML 内容必须做转义处理——禁止出现 `<script>` 标签、`onerror`/`onload` 等事件属性、`javascript:` 伪协议。HTML 属性值中的双引号必须转义为 `\"`。仅允许使用安全的展示性 HTML（`<details>`、`<summary>`、`<div>`、`<span>`、`<b>`、`<hr>`、`<br>` 及内联 `style` 属性）。
 
