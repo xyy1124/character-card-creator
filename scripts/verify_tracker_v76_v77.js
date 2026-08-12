@@ -185,17 +185,31 @@ function verifyTrackerV76V77(card, options = {}) {
         );
       }
     } else if (field.type === "string") {
-      requireRule(
-        field.allowCustomValues === false,
-        `${path}.allowCustomValues`,
-        "有限枚举 string 字段必须严格等于 false"
-      );
+      const isEnumerated = field.allowCustomValues === false;
       const states = field.presentation?.states;
-      requireRule(
-        plain(states) && Object.keys(states).length >= 2,
-        `${path}.presentation.states`,
-        "必须声明至少 2 个枚举（v76 标准）"
-      );
+      if (isEnumerated) {
+        // 枚举模式：必须 states≥2 + initialState 命中
+        requireRule(
+          plain(states) && Object.keys(states).length >= 2,
+          `${path}.presentation.states`,
+          "枚举模式必须声明至少 2 个 states"
+        );
+        requireRule(
+          typeof initial[key] === "string" &&
+            plain(states) && own(states, initial[key]),
+          `tracker.initialState.${key}`,
+          "枚举模式 initialState 必须精确命中 presentation.states 的 key"
+        );
+      } else {
+        // 自由文本模式（allowCustomValues:true 或省略）：states 可选，仅作显示参考
+        if (states != null) {
+          requireRule(
+            plain(states) && Object.keys(states).length > 0,
+            `${path}.presentation.states`,
+            "自由模式 states（如声明）必须为非空对象"
+          );
+        }
+      }
 
       for (const [stateKey, state] of Object.entries(plain(states) ? states : {})) {
         const statePath = `${path}.presentation.states.${stateKey}`;
@@ -218,13 +232,6 @@ function verifyTrackerV76V77(card, options = {}) {
           "必须为非空描述"
         );
       }
-
-      requireRule(
-        typeof initial[key] === "string" &&
-          plain(states) && own(states, initial[key]),
-        `tracker.initialState.${key}`,
-        "必须精确命中 presentation.states 的 key"
-      );
     } else {
       requireRule(false, `${path}.type`, "只允许 number 或 string");
     }
