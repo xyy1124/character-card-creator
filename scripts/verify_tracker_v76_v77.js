@@ -248,6 +248,10 @@ function verifyEntityTrackerV2(tracker, options = {}) {
         requireRule(tKeys.includes(k), `${ePath}.initialState.${k}`, "override 只能使用模板字段 key");
       }
     }
+    // v91：initiallyAppeared 必须是 bool（缺省 false 合法）
+    if (entity.initiallyAppeared !== undefined) {
+      requireRule(typeof entity.initiallyAppeared === "boolean", `${ePath}.initiallyAppeared`, "必须是布尔值（true=开局在场 / false=出场才显示）");
+    }
   }
 
   // 3. discovery
