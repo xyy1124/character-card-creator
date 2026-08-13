@@ -132,6 +132,41 @@ function verifyFieldSchema(h, field, initialValue, path, templateFieldKeys) {
 }
 
 // ---- v1：v76/v77 静态卡（原规则不变）----
+// ---- v95：模板颜色可解析性（App 只解析 6 位 #hex）----
+// LnnLore tracker_runtime 从**外层 tracker.template** 的 border 属性与
+// linear-gradient 提取面板样式，且只解析 6 位 hex（_parseColor 只处理
+// hex.length == 6）。rgb()/rgba()/hsl()/hsla() 与 3 位/8 位 hex 会被提取
+// 正则跳过或解析失败 → 样式回退默认主题色 → 各卡面板"渲染都长一样"。
+// 本检查只针对这两处片段（内部装饰如 rgba 分隔线不影响 App 提取且
+// HtmlWidget 兼容渲染，不拦）；sectionTemplate 不检查（v2 原生 Tab UI
+// 不以它为样式权威）。
+function verifyTemplateColors(h, template, path) {
+  const { requireRule } = h;
+  if (!template) return;
+  const spans = [];
+  for (const m of template.matchAll(/linear-gradient\s*\([^)]*\)/gi)) {
+    spans.push(m[0]);
+  }
+  const borderM = template.match(/border\s*:[^;]*;/i);
+  if (borderM) {
+    spans.push(borderM[0]);
+  }
+  for (const span of spans) {
+    requireRule(
+      !/rgba?\s*\(|hsla?\s*\(/i.test(span),
+      path,
+      "border/渐变颜色必须使用 6 位 #hex（rgb()/rgba()/hsl()/hsla() 会导致样式回退默认主题色）"
+    );
+    for (const match of span.matchAll(/#([0-9a-fA-F]{3,8})\b/g)) {
+      requireRule(
+        match[1].length === 6,
+        path,
+        `颜色 "#${match[1]}" 必须为 6 位 hex（#rrggbb；3 位/8 位 hex App 解析失败会回退默认主题色）`
+      );
+    }
+  }
+}
+
 function verifyStaticTrackerV1(tracker, options = {}) {
   const h = makeHelpers(options);
   const { requireRule, exactKeySet } = h;
@@ -165,6 +200,7 @@ function verifyStaticTrackerV1(tracker, options = {}) {
   requireRule(/<\/details>$/i.test(template), "tracker.template", "必须以 </details> 结束，外部不得残留文字");
   requireRule(!/<!--\s*\/?panel\s*-->/i.test(template), "tracker.template", "不得包含 panel 标记");
   requireRule(!/```|TRACKER_UPDATE|\{\{\s*setvar|必须输出|请输出|不得编造|变量更新|状态栏三件套/i.test(template), "tracker.template", "不得包含围栏、更新宏或输出指令");
+  verifyTemplateColors(h, template, "tracker.template");
 
   const macros = [];
   for (const match of template.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) {
@@ -209,7 +245,8 @@ function verifyEntityTrackerV2(tracker, options = {}) {
       const fieldPath = `${tPath}.stateSchema.${key}`;
       verifyFieldSchema(h, field, template.defaultState?.[key], fieldPath, fieldKeys);
     }
-    // sectionTemplate 校验
+    // sectionTemplate 校验（不查颜色——v2 原生 Tab UI 不以它为样式权威，
+    // HtmlWidget 兼容渲染支持 rgba 等完整 CSS）
     const section = typeof template.sectionTemplate === "string" ? template.sectionTemplate : "";
     if (section.trim()) {
       for (const match of section.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) {
@@ -294,6 +331,7 @@ function verifyEntityTrackerV2(tracker, options = {}) {
   requireRule(/<\/details>$/i.test(template), "tracker.template", "必须以 </details> 结束，外部不得残留文字");
   requireRule(!/<!--\s*\/?panel\s*-->/i.test(template), "tracker.template", "不得包含 panel 标记");
   requireRule(!/```|TRACKER_UPDATE|\{\{\s*setvar|必须输出|请输出|不得编造|变量更新|状态栏三件套/i.test(template), "tracker.template", "不得包含围栏、更新宏或输出指令");
+  verifyTemplateColors(h, template, "tracker.template");
   // 混合卡：根 stateSchema 字段宏允许在外层；实体字段宏必须在 sectionTemplate 内
   const rootSchema = h.plain(tracker?.stateSchema) ? tracker.stateSchema : {};
   const rootKeys = Object.keys(rootSchema);
