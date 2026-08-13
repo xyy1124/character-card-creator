@@ -65,7 +65,7 @@ description: 角色卡全流程创建助手：引导问答、Chara Card V2 JSON 
 
 ### 0.4 预检（工具调用前）
 
-生成开始前检查：输入文件/链接存在、公共脚本可执行（`scripts/lib/verify_tracker_v76_v77.js` 等）、目标目录可写、浏览器能力可用（restore/书源模式）。缺失项记为 blocker 并给出可恢复动作，**不得带着 blocker 硬做**。
+生成开始前检查：输入文件/链接存在、公共脚本可执行（`scripts/verify_tracker_v76_v77.js` 等）、目标目录可写、浏览器能力可用（restore/书源模式）。缺失项记为 blocker 并给出可恢复动作，**不得带着 blocker 硬做**。
 
 ### 0.5 intake_ready 门禁（引导完成标准）
 
@@ -114,9 +114,12 @@ CARDS_ROOT=<角色卡根目录> node scripts/card_agent.js <子命令> <卡名> 
 > 任何新建、还原或修改含状态栏（tracker）角色卡的任务，在生成 JSON 前都必须阅读并执行
 > [DZMM/aikda 还原流程第 5 步：Tracker v76/v77 门禁](#tracker-v76v77-gate)。
 >
+> **🔴 协议选择门（v89）**：先按 [强制规则〇·补充的决策树](#强制规则〇补充tracker-协议声明app-运行时) 判断用 v1 还是 v2——
+> v1 执行 v76/v77 门禁；v2（schemaVersion 2 动态实体卡）额外执行 v89 实体卡附加门禁。
+>
 > **禁止**复制旧卡 tracker、**禁止**手写旧式简化 schema、**禁止**仅凭 JSON 可解析或字段存在性判定通过。
 > App 对旧卡错误结构的兼容不是新卡格式标准。生成脚本必须在写盘前调用公共验证器
-> `scripts/lib/verify_tracker_v76_v77.js`（工作区根目录）；独立验证脚本读盘后必须再次调用同一公共函数。
+> `scripts/verify_tracker_v76_v77.js`（工作区根目录，入口按 schemaVersion 自动分流 v1/v2）；独立验证脚本读盘后必须再次调用同一公共函数。
 
 ## 可用世界书资源——写作DNA注入系统
 
@@ -297,6 +300,7 @@ CARDS_ROOT=<角色卡根目录> node scripts/card_agent.js <子命令> <卡名> 
 > 3. **⚠️ 52 条基础条目必须角色化（强制）**：条目名（comment）保持不变，但 content 必须针对该角色卡做细致特化——融入本卡的世界观、玩法机制、角色语言与感官特点，**不得原样照搬通用版**。通用源备份（`workflow/world-books/` 下的 RisuAI 原版与 ST 副本）保持原样不动。
 >    - 角色化方式：01-04 类核心条目（身体/生理/情境/支配）建议全文改写为本卡玩法版；05 类写作技法可保留原内容并追加「本卡特化」段说明该技法在本卡的运用。
 >    - **群像卡注意**：若角色卡是群像/世界观卡（如「身为乞丐的你被各种仙子带回家」），角色化必须针对「群像共同玩法」（如气味勾引/闻精高潮/绿帽奴/献祭扩展），不得绑定单一角色名。
+>    - **🔴 群像卡协议判断（v89）**：群像共同玩法之外，还需判断是否有**两个以上独立持久状态**（各自的好感/改造/洗脑进度），或世界书有**换人/新成员/随机 NPC/开放原作角色池**机制——命中则转 [强制规则〇·补充：tracker 协议声明](#强制规则〇补充tracker-协议声明app-运行时) 的 v2 决策树，用 `schemaVersion: 2` 动态实体协议（模板 + 预设实体 + 自动建档），不得用 v1 单套状态硬装多角色。
 >    - 角色化后的 52 条须经编号泄漏自检（content 不得含「0X-§」编号）。
 > 4. 最终条目数不得少于52条——定制条目+角色化52条的总和。
 
@@ -754,7 +758,7 @@ SillyTavern 独立世界书 JSON 格式：
 
 ### 第 5 步·附：Tracker v76/v77 门禁（生成 tracker 的唯一规范，强制）
 
-从角色设定和实际剧情事件重新设计 `data.extensions.tracker`。只能使用标准 tracker 模板或公共 builder（`scripts/lib/verify_tracker_v76_v77.js` 配套模板）；**不得复制旧卡 tracker**，不得调用仍生成简化 schema 的旧注入器（`scripts/build/gen_tracker_decl.js` 已弃用），不得用 App 的旧卡兼容行为代替正确声明。
+从角色设定和实际剧情事件重新设计 `data.extensions.tracker`。只能使用标准 tracker 模板或公共 builder（`scripts/verify_tracker_v76_v77.js` 配套模板）；**不得复制旧卡 tracker**，不得调用仍生成简化 schema 的旧注入器（`scripts/build/gen_tracker_decl.js` 已弃用），不得用 App 的旧卡兼容行为代替正确声明。
 
 每个 number 字段必须为本卡显式填写剧情词表，并同时写入 `updatePolicy.qualitativeDeltas`。生成脚本必须把相同词表作为 `storyTermsByField` 传给公共验证器。没有剧情词表的 number 字段不得生成。
 
@@ -770,9 +774,25 @@ SillyTavern 独立世界书 JSON 格式：
 8. `uiHints.order` 不得重复，并且与 `stateSchema` key 集合完全一致；`initialState` key 集合也必须完全一致。
 9. `tracker.template` 必须是纯面板 HTML：去除首尾空白后以 `<details` 开头、以 `</details>` 结束，不含 `<!--panel-->`、说明/输出指令、Markdown 围栏、`setvar` 或无 `::key` 的裸宏；必须覆盖全部字段（含隐藏字段）。number 描述使用 `{{getnarrative::key}}`，string 描述使用 `{{gettext::key}}`。
 
-**生成脚本必须先在内存中调用 `verifyTrackerV76V77`（`scripts/lib/verify_tracker_v76_v77.js`），验证成功后才允许 `writeFileSync`。** 写盘后，独立 `_verify_<id>.js` 必须再次调用同一个公共验证器（`throwOnError: false` + 累计报告 + 非零退出码）。
+**生成脚本必须先在内存中调用 `verifyTrackerV76V77`（`scripts/verify_tracker_v76_v77.js`），验证成功后才允许 `writeFileSync`。** 写盘后，独立 `_verify_<id>.js` 必须再次调用同一个公共验证器（`throwOnError: false` + 累计报告 + 非零退出码）。
 
 边界说明：以上第 9 项只约束 `data.extensions.tracker.template`。`data.post_history_instructions` 是 ST/App 兼容层，可以且在既定模板中应保留状态更新规则、变量宏（`{{setvar::}}` 行）及 `<!--panel-->...<!--/panel-->` 面板块。**不得以 v76/v77 为理由清洗 PHI**；同时"输出面板/状态栏"指令句仍受 v71 检查约束（指示模型每轮输出面板的句子禁止出现，见质量检查 v71 项）。App 模式由剥离层在注入模型前处理 PHI，模型只返回状态 patch，最终 HTML 由 App 渲染。
+
+#### Tracker v89 实体卡附加门禁（仅 schemaVersion ≥ 2 启用）
+
+> 群像/动态实体卡（schemaVersion: 2）在通过上方 v76/v77 九项自检（语义对应到模板字段）之外，还必须通过以下九项 v89 附加自检。统一验证器 `scripts/verify_tracker_v76_v77.js` 入口按 schemaVersion 自动分流 v1/v2，**生成/验证脚本直接调用即可，无需自行判断分支**。
+
+1. **模板声明**：`entityTemplates` 至少 1 个模板，每个模板含非空 `label`、`defaultState`（对象）、`stateSchema`（≥1 字段）与 `sectionTemplate`（非空）。
+2. **模板字段**：模板内字段沿用 v76/v77 全部字段级规则（type/range/presentation/updatePolicy/semanticHints/aliases），语义去角色化——meaning 写"该角色"，角色归属由裁判协议保证。
+3. **预设实体**：`initialEntities` 每项 `id` 非空且**不含点号**（实例 key 用点分隔）、`displayName` 非空、`templateId` 引用已声明模板；**id 不得重复**；`initialState` override 只能使用模板字段 key。
+4. **自动建档**：`entityDiscovery.enabled` 为 true 时，`defaultTemplateId` 必须引用已声明模板，`maxAutoEntities` 为 1..24 整数。只预设剧情核心角色（2-4 个），其余靠自动建档。
+5. **迁移**：`migrations` 每项 `id` 唯一、`targetEntityId` 必须是预设实体、`fieldMap` 键值均为字符串且目标 local key 在模板字段内；**仅"所有权唯一且语义等价"的旧 key 迁移**，聚合状态/"当前对象"槽不得扇出。
+6. **外层模板**：`tracker.template` 必须以 `<details` 开头、`</details>` 结束，且**只含 `{{entitysections::模板ID}}` 插槽**（引用已声明模板）；外层不允许裸 `getvar` 等字段宏（实体字段宏必须在 sectionTemplate 内）。
+7. **分区模板**：`sectionTemplate` 允许 `{{entityid}}`/`{{entityname}}` 与当前模板 local 字段宏（getvar/gettitle/gettext/getcolor/getpercent/getnarrative::字段），**禁止引用模板外字段**。
+8. **uiHints**：单模板卡 `uiHints.order` 与模板字段集一致；多模板卡 order 属于 discovery 默认模板字段集（其余模板由 sectionTemplate 验序）。
+9. **角色归属排他**：裁判协议强制某实体事件只更新该实体自己的字段；narrative 遵循剧情摘录契约（15-45 字单句，禁止解释数值/判断过程）。**实体卡在 App 选"快速"模式自动降级后台**——设计行为，非异常。
+
+**边界说明**：v2 卡允许根 `stateSchema`/`initialState` 存在（混合卡：全局/场景字段留根，角色私有字段只进模板），但同一字段禁止双写。
 
 ### 写作准则（书源学习沉淀，每次建卡必须遵守）
 
@@ -1116,7 +1136,7 @@ New-Item -ItemType Directory -Path "cards/<角色名>/world-books" -Force
 - **🔴 写作特化角色化检查（强制执行）**：写作特化非定制条目 content 与 `workflow/world-books/写作技法世界书_ST.json` 通用源逐条对比，**原样照搬条数必须为 0**——任何一条完全等于通用版即 FAIL（即该卡尚未角色化，须先完成角色化再交付）。
 - **🔴 配套世界书色情化检查（仅当用户明确成人向内容时执行）**：配套 ST 全部条目 content 中不得出现 meta 标注词（黄油提示/攻略要点/可攻略/图鉴/PLAY）；且色情词命中 ≥3 处（双修/媚药/淫/骚/屄/肉棒/精液/内射/肏/奶子/高潮 等——世界观底色必须含色情元素，符合五点五节）。**普通/全年龄/非色情题材的卡跳过本项**（profile 不涉及成人向内容时不得强制色情化）。
 - **🔴 状态面板模板完整性检查（v68 强制执行——"只有说明文字、无实际模板"是整卡级漏配）**：① `post_history_instructions` 必须同时含 `<!--panel-->` 与 `<!--/panel-->`（只出现开头标记即 FAIL）；② 两标记之间必须是完整 HTML 模板（含 `<details><summary>`、`linear-gradient`、每字段 `{{getvar::`+`{{gettitle::`+`{{getcolor::` 行）——**禁止**只有"再输出 <!--panel--> 面板。面板数值与剧情一致"这类说明文字充当模板；③ `tracker.uiHints.order` 存在且与 stateSchema key 集合一致；④ `tracker.template` 存在且含 `{{getvar::`。四项缺一即 FAIL（辉夜大小姐NTL/斗罗淫神NTL 两张卡曾因此只有内置兜底样式）。
-- **🔴 Tracker v76/v77 门禁检查（强制执行——"新卡 tracker 旧协议格式"是最高频整卡级事故，娇气师尊NTL 曾全旧格式交付）**：生成与验证必须调用公共验证器 `scripts/lib/verify_tracker_v76_v77.js`（工作区根目录），九项自检见还原流程第 5 步·附锚点 `#tracker-v76v77-gate`。要点：semanticHints 在 updatePolicy 内/信号数组/**string 字段双模式**（枚举模式：allowCustomValues=false + states key==title（≤12 字短名）+ initialState 在枚举；**自由文本模式：allowCustomValues:true 或省略，states 可选**——用户核心要求）/aliases 含 label/qualitativeDeltas 含通用四词（一点/稍微/明显/大幅）+ 本卡剧情词（storyTermsByField 显式提供）/uiHints.order 与 initialState 均与 stateSchema key 完全一致/template 纯 `<details>` HTML 覆盖全部字段（含隐藏字段；number 用 getnarrative、string 用 gettext）。**任一失败：生成脚本不得写盘、验证脚本返回非零退出码、禁止交付**。改卡后必须提示重新导入（App 不自动刷新已导入副本）。
+- **🔴 Tracker v76/v77 门禁检查（强制执行——"新卡 tracker 旧协议格式"是最高频整卡级事故，娇气师尊NTL 曾全旧格式交付）**：生成与验证必须调用公共验证器 `scripts/verify_tracker_v76_v77.js`（工作区根目录），九项自检见还原流程第 5 步·附锚点 `#tracker-v76v77-gate`。要点：semanticHints 在 updatePolicy 内/信号数组/**string 字段双模式**（枚举模式：allowCustomValues=false + states key==title（≤12 字短名）+ initialState 在枚举；**自由文本模式：allowCustomValues:true 或省略，states 可选**——用户核心要求）/aliases 含 label/qualitativeDeltas 含通用四词（一点/稍微/明显/大幅）+ 本卡剧情词（storyTermsByField 显式提供）/uiHints.order 与 initialState 均与 stateSchema key 完全一致/template 纯 `<details>` HTML 覆盖全部字段（含隐藏字段；number 用 getnarrative、string 用 gettext）。**任一失败：生成脚本不得写盘、验证脚本返回非零退出码、禁止交付**。改卡后必须提示重新导入（App 不自动刷新已导入副本）。
 - **🔴 模型不输出面板检查（v71 强制执行——检查 App 注入剥离后的结果，不是清洗源 PHI）**：App 注入模型前的文本（剥离层处理 `post_history_instructions` 的输出面板指令/`{{setvar}}` 变量更新行/裸 `<details>` 旧面板/代码块旧面板后）不得含"输出状态栏/面板"HTML 指令。**源 `post_history_instructions` 保留既定变量宏与 `<!--panel-->...<!--/panel-->` 面板块是标准格式（ST 兼容层，与 tracker.template 各自独立）——不得以 v76/v77 为理由清洗 PHI；"输出面板/状态栏"指令句仍受 v71 检查禁止（见强制规则〇 verify 项）**；剥离由 App 注入层完成，卡侧不参与。
 - **写入文件前验证 JSON 合法性：用 `JSON.parse` 读取文件，路径通过 `process.argv` 传参（禁止字符串拼接），命令格式：`node -e "JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))" -- <文件路径>`**
 
@@ -1171,6 +1191,60 @@ New-Item -ItemType Directory -Path "cards/<角色名>/world-books" -Force
   - `uiHints`：`{order: [字段key…]}`（**v68 强制——必须存在且与 stateSchema key 集合一致**；`template` 放 tracker 顶层，`uiHints.template` 仍兼容读取但不再推荐）
   - `template`（**v68 强制**）：自定义面板 HTML 模板（v54 起推荐放 tracker 顶层；`uiHints.template` 兼容）——**HTML 面板本体与 `post_history_instructions` 的 `<!--panel-->` 块逐字一致（外层 `<!--panel-->` 标记不复制进 template）**（App 渲染用），缺失时 App 只能用内置兜底样式、丢失卡自定义面板（辉夜大小姐NTL/斗罗淫神NTL 两张卡曾因缺失只有紫色 chips 兜底）
   - `defaultExpanded`（可选）：状态面板初始是否展开（v54 支持；不声明默认收起，用户手动偏好优先）
+- **🔴 协议选择门（v89 强制，先定归属再定协议）**：生成/修改 tracker 前先按以下决策树选 `schemaVersion`：
+  1. **v1（`schemaVersion: "1.0"`，默认兼容）**：全局/场景/玩家量 或 固定单主角私有状态（如假小子青梅的兴奋度/羞耻度、娇气师尊的信任度/色诱进度）。
+  2. **v2（`schemaVersion: 2`，动态实体卡）**：满足任一即用 v2——
+     - **两个以上具名角色有同构独立状态**（如芭蕾三姐妹各一套好感）；
+     - **"当前对象"槽会覆盖历史**（如一觉睡醒的 girl 字段换了人就丢旧值）；
+     - **世界书明确随机 NPC/招募/入门/换人机制、阵营成员持续登场、任意原作角色可成为持续目标**（如母猪教信众、苏蕴泠新弟子、蜜欧拉随机生成 NPC、斗罗/辉夜原作角色池）。
+  3. 普通群演、偶发配角、NTR/多人标签本身**不**触发 v2。
+  4. v2 卡内：全局/场景字段留根 `stateSchema`，角色私有字段只进 `entityTemplates.*.stateSchema`——**禁止双写**（同一字段同时出现在根与模板）。
+- **🔴 v2 动态角色实体协议（v89，schemaVersion: 2）**：群像卡按"模板 + 预设实体 + 自动建档"组织。完整结构（真实 8 键，根 stateSchema/initialState 仅混合卡需要）：
+  ```json
+  {
+    "schemaVersion": 2,
+    "entityTemplates": {
+      "brainwashed_female": {
+        "label": "角色洗脑状态",
+        "defaultState": { "xno_depth": 0, "xno_layer": 0, "xno_cloth": "衣着未记录", "xno_lewd": 0 },
+        "stateSchema": {
+          "xno_depth": { "type": "number", "label": "洗脑深度", "min": 0, "max": 100,
+            "presentation": { "ranges": [ { "gte": 0, "lt": 20, "title": "清醒", "color": "#5dade2", "text": "神志清醒，对一切保持警惕。" } ] },
+            "updatePolicy": { "mode": "conservative",
+              "qualitativeDeltas": { "一点": 1, "稍微": 2, "明显": 5, "大幅": 10, "持续灌输": 3 },
+              "maxAutoDeltaPerTurn": 10,
+              "semanticHints": { "meaning": "该角色被洗脑的深度。剧情中任何使她的意识受控程度发生实质变化的事件都应更新。",
+                "positiveSignals": ["持续灌输", "洗脑"], "negativeSignals": ["清醒仙诀"], "neutralSignals": ["普通对话"] } },
+            "aliases": ["洗脑深度"] }
+        },
+        "sectionTemplate": "<section><div style=\"font-weight:700;\">{{entityname}}</div><span>洗脑深度</span>：<b>【{{getvar::xno_depth}}/100】</b> <span style=\"color:{{getcolor::xno_depth}};\">· {{gettitle::xno_depth}}</span><br><span style=\"font-size:11px;\">{{getnarrative::xno_depth}}</span></section>"
+      }
+    },
+    "initialEntities": [
+      { "id": "szh", "displayName": "沈昭华", "aliases": ["昭华仙子"], "templateId": "brainwashed_female",
+        "initialState": { "xno_depth": 90, "xno_layer": 2, "xno_cloth": "松散半敞", "xno_lewd": 85 } },
+      { "id": "lql", "displayName": "洛青鸾", "aliases": ["青鸾"], "templateId": "brainwashed_female",
+        "initialState": { "xno_depth": 0, "xno_cloth": "仙裙整齐" } }
+    ],
+    "entityDiscovery": { "enabled": true, "defaultTemplateId": "brainwashed_female", "maxAutoEntities": 24 },
+    "migrations": [
+      { "id": "legacy-xno-to-szh-v1", "targetEntityId": "szh",
+        "fieldMap": { "xno_depth": "xno_depth", "xno_layer": "xno_layer", "xno_cloth": "xno_cloth", "xno_lewd": "xno_lewd" } }
+    ],
+    "template": "<details><summary>💜 状态面板</summary><div>{{entitysections::brainwashed_female}}</div></details>",
+    "actions": [ { "id": "view_status", "label": "查看状态", "prompt": "汇总当前各状态值" } ],
+    "uiHints": { "order": ["xno_depth", "xno_layer", "xno_cloth", "xno_lewd"] }
+  }
+  ```
+  - **字段定义规则与 v1 完全一致**（presentation/updatePolicy/semanticHints/aliases 同 v76/v77 九项门禁），差异只是字段从根 `stateSchema` 移入 `entityTemplates.<id>.stateSchema`；语义去角色化——meaning 写"该角色"，角色归属由裁判协议保证。
+  - **initialEntities**（预设实体）：`{id, displayName, aliases, templateId, initialState}`；id 用稳定短 ID（如 szh/lql），**不得含点号**；initialState 只覆盖模板字段 key；**新角色初值来自模板 defaultState/开局事实，绝不复制既有实体值**。
+  - **entityDiscovery**（自动建档）：`{enabled, defaultTemplateId, maxAutoEntities(1-24)}`——剧情中任何以具体人物出现且不在注册表的角色自动建档（dyn_ 永久 ID）；**只预设剧情核心角色**（2-4 个），其余靠自动建档（防 prompt 膨胀 + 未出场剧透）。
+  - **migrations**（旧 key 迁移）：`{id, targetEntityId, fieldMap:{旧key: 模板字段key}}`——仅"所有权唯一且语义等价"的旧 key 迁移（如旧 `xno_depth` → szh 的 `xno_depth`）；聚合状态（如"三人好感"）、"当前对象"槽不得扇出迁移。
+  - **template 外层**只含 `{{entitysections::模板ID}}` 插槽；每实体分区在 `sectionTemplate` 内（`{{entityname}}`/`{{entityid}}` + 模板 local 字段宏）。
+  - **角色归属排他（裁判协议强制）**：某实体事件只更新该实体自己的字段，禁止镜像到其他实体；指代不清不更新。
+  - **narrative** 用剧情摘录契约（见红线段）：15-45 字单句，只摘已发生事实，禁止解释数值/判断过程。
+  - **⚠️ 实体卡在 App 选"快速"模式时自动降级后台**（主模型不输出 TRACKER_UPDATE 协议，状态由裁判按实体 envelope 维护）——这是设计行为，非异常。
+  - **验证**：v2 卡必须通过统一验证器 `scripts/verify_tracker_v76_v77.js`（入口按 schemaVersion 自动分流 v1/v2），详见 v89 实体卡附加门禁。
 - **字段级 `presentation` 阶段描述（v52 强制）**：**每个字段都必须声明**——App 按当前值**确定性渲染**阶段标题/颜色/长描述（数值变化文字自动变化，不依赖模型临时生成；长描述**不得**存入 initialState/变量表，避免污染模型提示与快照）。
   - **number 字段：`presentation.ranges`（≥3 段）**——`{gte, lt, title, color, text}`，`gte ≤ 值 < lt` 匹配，最后一段可省略 `lt` 兜底：
     ```json
@@ -1258,6 +1332,7 @@ New-Item -ItemType Directory -Path "cards/<角色名>/world-books" -Force
     9. **改动后必须重跑 verify（13 项 + 追加核对全过才可交付）**——不能只改字段不改协议，也不能改完不验证
     10. **整卡交付前检查面板模板完整性**（v68 强制——"post_history_instructions 只有说明文字、无实际模板"是独立于字段遗漏的整卡级漏配）：`<!--panel-->`/`<!--/panel-->` 成对、中间是完整 `<details>` HTML 模板、`uiHints.order` 存在、`tracker.template` 存在
     判定口诀：**"新增 number 字段 = 新增 updatePolicy + semanticHints + 面板 getnarrative 行 + setvar 行"四个动作必须同时发生**。
+    **🔴 v89 口诀补充：先定归属，再定协议——单主角/全局状态用 v1，开放或并列角色状态用 v2；实体模板字段仍守 semanticHints 与全部红线。**
 - 模型输出协议（v70 单一写入者架构）：**模型永远不输出状态栏/HTML 面板**（面板由 App 按最终状态自动渲染）。状态更新的形式由 App 的"状态更新模式"决定（卡无需声明）：
   - **快速模式（默认）**：主模型是唯一状态写入者——正文正常输出，末尾追加 `<TRACKER_UPDATE>...</TRACKER_UPDATE>` 标记块（短 JSON，不把正文塞进 JSON reply）：
     ```
@@ -1267,7 +1342,7 @@ New-Item -ItemType Directory -Path "cards/<角色名>/world-books" -Force
     ```
   - **后台/严格模式**：主模型**只输出正文**（禁止输出 JSON/STATE/HTML/状态栏），状态由独立裁判决定；裁判可输出最终状态 `{"state":{"字段key":最终值}}` 一次性保存，或增量 patch。
   - 兜底协议：JSON patch `{"patch":{"set":{},"add":{}},"choices":[]}`（App 解析校验后入库）或 `<STATE> k=v </STATE>`。**卡侧不需要任何"让模型输出面板"的指令**——输出指令由 App 注入，卡只提供字段含义/变化规则/行为约束。
-- 生成流程：**`scripts/build/gen_tracker_decl.js` 已弃用，禁止使用**（仍生成简化旧 schema）——按「tracker 协议声明」节标准模板在内存中构造声明；写盘前必须调用公共验证器 `scripts/lib/verify_tracker_v76_v77.js`；verify 检查 13 项（声明存在/stateSchema≥3/initialState≥3/actions≥2/uiHints/**每个 number 字段有 ranges≥3**/**每个 number 字段有 updatePolicy+semanticHints（漏一即失败）**/**string 字段双模式：枚举模式（allowCustomValues=false）必须 states≥2+key==title；自由文本模式（allowCustomValues:true/省略）不强制 states**/模板含 `{{gettitle::`/**presentation 字段的面板行含 getcolor+getnarrative**/**v68：`<!--/panel-->` 结束标记存在且 `tracker.uiHints.order`/`tracker.template` 齐全（面板模板完整性，缺一即失败）**/**v76：semanticHints 必须在 updatePolicy 内（字段顶层即 FAIL）+ 信号必须是数组（字符串即 FAIL）+ string 枚举模式 allowCustomValues=false（枚举字段漏配即 FAIL）+ 枚举模式 states key==title（key≠title 即 FAIL）+ 枚举模式 initialState 值在枚举中 + aliases 非空（漏一即失败）**/**v77：`tracker.template` 以 `<details>` 开头、不含 `<!--panel-->`/指令文本/裸引用（命中即 FAIL）**）。
+- 生成流程：**`scripts/build/gen_tracker_decl.js` 已弃用，禁止使用**（仍生成简化旧 schema）——按「tracker 协议声明」节标准模板在内存中构造声明；写盘前必须调用公共验证器 `scripts/verify_tracker_v76_v77.js`（入口按 schemaVersion 自动分流 v1/v2）；verify 检查 13 项（声明存在/stateSchema≥3/initialState≥3/actions≥2/uiHints/**每个 number 字段有 ranges≥3**/**每个 number 字段有 updatePolicy+semanticHints（漏一即失败）**/**string 字段双模式：枚举模式（allowCustomValues=false）必须 states≥2+key==title；自由文本模式（allowCustomValues:true/省略）不强制 states**/模板含 `{{gettitle::`/**presentation 字段的面板行含 getcolor+getnarrative**/**v68：`<!--/panel-->` 结束标记存在且 `tracker.uiHints.order`/`tracker.template` 齐全（面板模板完整性，缺一即失败）**/**v76：semanticHints 必须在 updatePolicy 内（字段顶层即 FAIL）+ 信号必须是数组（字符串即 FAIL）+ string 枚举模式 allowCustomValues=false（枚举字段漏配即 FAIL）+ 枚举模式 states key==title（key≠title 即 FAIL）+ 枚举模式 initialState 值在枚举中 + aliases 非空（漏一即失败）**/**v77：`tracker.template` 以 `<details>` 开头、不含 `<!--panel-->`/指令文本/裸引用（命中即 FAIL）**）。**🔴 v89 v2 卡生成路径**：先按决策树定协议 → 列字段所有者与世界书未来角色池 → 全局字段留根/角色字段进模板 → 选预设实体（2-4 个核心）+ 是否开自动建档 + 迁移声明 → 外层模板只放 `{{entitysections::}}`、分区模板写 sectionTemplate → 同一验证器验证（v2 分支自动启用）→ verify 检查九项实体卡附加门禁（模板/预设/discovery/migration/entitysections/sectionTemplate 越权/uiHints/角色排他/quick 降级）。
 - **🔴 verify 追加核对（v63 后强制，逐字段对照，不只是"至少有一个"）**：
   1. **每个 number 字段**：面板行含 `{{getnarrative::<key>}}` 且**不含** `{{gettext::<key>}}`（漏配或误用 gettext 即 FAIL）
   2. **每个 string 字段**：面板行含 `{{gettext::<key>}}`（gettext 仅 string 字段使用）
