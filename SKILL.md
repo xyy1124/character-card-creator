@@ -784,7 +784,7 @@ SillyTavern 独立世界书 JSON 格式：
 
 1. **模板声明**：`entityTemplates` 至少 1 个模板，每个模板含非空 `label`、`defaultState`（对象）、`stateSchema`（≥1 字段）与 `sectionTemplate`（非空）。
 2. **模板字段**：模板内字段沿用 v76/v77 全部字段级规则（type/range/presentation/updatePolicy/semanticHints/aliases），语义去角色化——meaning 写"该角色"，角色归属由裁判协议保证。
-3. **预设实体**：`initialEntities` 每项 `id` 非空且**不含点号**（实例 key 用点分隔）、`displayName` 非空、`templateId` 引用已声明模板；**id 不得重复**；`initialState` override 只能使用模板字段 key。
+3. **预设实体**：`initialEntities` 每项 `id` 非空且**不含点号**（实例 key 用点分隔）、`displayName` 非空、`templateId` 引用已声明模板；**id 不得重复**；`initialState` override 只能使用模板字段 key；**`initiallyAppeared`（如声明）必须是布尔值（v91）**——`true`=开局在场立即显示，`false`/省略=出场才显示。
 4. **自动建档**：`entityDiscovery.enabled` 为 true 时，`defaultTemplateId` 必须引用已声明模板，`maxAutoEntities` 为 1..24 整数。只预设剧情核心角色（2-4 个），其余靠自动建档。
 5. **迁移**：`migrations` 每项 `id` 唯一、`targetEntityId` 必须是预设实体、`fieldMap` 键值均为字符串且目标 local key 在模板字段内；**仅"所有权唯一且语义等价"的旧 key 迁移**，聚合状态/"当前对象"槽不得扇出。
 6. **外层模板**：`tracker.template` 必须以 `<details` 开头、`</details>` 结束，且**只含 `{{entitysections::模板ID}}` 插槽**（引用已声明模板）；外层不允许裸 `getvar` 等字段宏（实体字段宏必须在 sectionTemplate 内）。
@@ -1237,10 +1237,11 @@ New-Item -ItemType Directory -Path "cards/<角色名>/world-books" -Force
   }
   ```
   - **字段定义规则与 v1 完全一致**（presentation/updatePolicy/semanticHints/aliases 同 v76/v77 九项门禁），差异只是字段从根 `stateSchema` 移入 `entityTemplates.<id>.stateSchema`；语义去角色化——meaning 写"该角色"，角色归属由裁判协议保证。
-  - **initialEntities**（预设实体）：`{id, displayName, aliases, templateId, initialState}`；id 用稳定短 ID（如 szh/lql），**不得含点号**；initialState 只覆盖模板字段 key；**新角色初值来自模板 defaultState/开局事实，绝不复制既有实体值**。
-  - **entityDiscovery**（自动建档）：`{enabled, defaultTemplateId, maxAutoEntities(1-24)}`——剧情中任何以具体人物出现且不在注册表的角色自动建档（dyn_ 永久 ID）；**只预设剧情核心角色**（2-4 个），其余靠自动建档（防 prompt 膨胀 + 未出场剧透）。
+  - **initialEntities**（预设实体）：`{id, displayName, aliases, templateId, initialState, initiallyAppeared?}`；id 用稳定短 ID（如 szh/lql），**不得含点号**；initialState 只覆盖模板字段 key；**新角色初值来自模板 defaultState/开局事实，绝不复制既有实体值**。
+  - **🔴 initiallyAppeared（v91）**：布尔值，声明该预设角色**开局是否已在场**（主角/开场即登场角色 → `true`；开场未登场、等待剧情出场的配角 → `false` 或省略）。**未出场的角色不显示在状态面板**——出场判定（裁判 appearedEntityRefs）：该角色在本会话截至当前消息至少真实进入叙事一次（当场说话/行动/被互动/明确处于当前场景）；只在名单/设定中出现、被提到/回忆、计划邀请但未实际出现、"她"指代不清、仅因为属于初始实体都**不算出场**。出场状态单向累积（出场后永久显示，离场不清零）。生成时：**主角/必登场角色标 true，其余预设标 false 靠剧情触发**——避免面板开局堆满未登场角色。
+  - **entityDiscovery**（自动建档）：`{enabled, defaultTemplateId, maxAutoEntities(1-24)}`——剧情中任何以具体人物出现且不在注册表的角色自动建档（dyn_ 永久 ID，自动视为已出场）；**只预设剧情核心角色**（2-4 个），其余靠自动建档（防 prompt 膨胀 + 未出场剧透）。
   - **migrations**（旧 key 迁移）：`{id, targetEntityId, fieldMap:{旧key: 模板字段key}}`——仅"所有权唯一且语义等价"的旧 key 迁移（如旧 `xno_depth` → szh 的 `xno_depth`）；聚合状态（如"三人好感"）、"当前对象"槽不得扇出迁移。
-  - **template 外层**只含 `{{entitysections::模板ID}}` 插槽；每实体分区在 `sectionTemplate` 内（`{{entityname}}`/`{{entityid}}` + 模板 local 字段宏）。
+  - **template 外层**只含 `{{entitysections::模板ID}}` 插槽；每实体分区在 `sectionTemplate` 内（`{{entityname}}`/`{{entityid}}` + 模板 local 字段宏）。**🔴 v91 定位说明**：LnnLore App 内实体卡面板已改为**原生角色 Tab 渲染**（顶部 TabBar 切换角色，每角色字段卡）——`sectionTemplate` 不再决定 App 内布局，仅保留用于**其他客户端/导出兼容**；生成时仍按规范写（字段宏/越权校验不变），但不必为 App 内观感过度设计 HTML 样式。
   - **角色归属排他（裁判协议强制）**：某实体事件只更新该实体自己的字段，禁止镜像到其他实体；指代不清不更新。
   - **narrative** 用剧情摘录契约（见红线段）：15-45 字单句，只摘已发生事实，禁止解释数值/判断过程。
   - **⚠️ 实体卡在 App 选"快速"模式时自动降级后台**（主模型不输出 TRACKER_UPDATE 协议，状态由裁判按实体 envelope 维护）——这是设计行为，非异常。
@@ -1342,7 +1343,7 @@ New-Item -ItemType Directory -Path "cards/<角色名>/world-books" -Force
     ```
   - **后台/严格模式**：主模型**只输出正文**（禁止输出 JSON/STATE/HTML/状态栏），状态由独立裁判决定；裁判可输出最终状态 `{"state":{"字段key":最终值}}` 一次性保存，或增量 patch。
   - 兜底协议：JSON patch `{"patch":{"set":{},"add":{}},"choices":[]}`（App 解析校验后入库）或 `<STATE> k=v </STATE>`。**卡侧不需要任何"让模型输出面板"的指令**——输出指令由 App 注入，卡只提供字段含义/变化规则/行为约束。
-- 生成流程：**`scripts/build/gen_tracker_decl.js` 已弃用，禁止使用**（仍生成简化旧 schema）——按「tracker 协议声明」节标准模板在内存中构造声明；写盘前必须调用公共验证器 `scripts/verify_tracker_v76_v77.js`（入口按 schemaVersion 自动分流 v1/v2）；verify 检查 13 项（声明存在/stateSchema≥3/initialState≥3/actions≥2/uiHints/**每个 number 字段有 ranges≥3**/**每个 number 字段有 updatePolicy+semanticHints（漏一即失败）**/**string 字段双模式：枚举模式（allowCustomValues=false）必须 states≥2+key==title；自由文本模式（allowCustomValues:true/省略）不强制 states**/模板含 `{{gettitle::`/**presentation 字段的面板行含 getcolor+getnarrative**/**v68：`<!--/panel-->` 结束标记存在且 `tracker.uiHints.order`/`tracker.template` 齐全（面板模板完整性，缺一即失败）**/**v76：semanticHints 必须在 updatePolicy 内（字段顶层即 FAIL）+ 信号必须是数组（字符串即 FAIL）+ string 枚举模式 allowCustomValues=false（枚举字段漏配即 FAIL）+ 枚举模式 states key==title（key≠title 即 FAIL）+ 枚举模式 initialState 值在枚举中 + aliases 非空（漏一即失败）**/**v77：`tracker.template` 以 `<details>` 开头、不含 `<!--panel-->`/指令文本/裸引用（命中即 FAIL）**）。**🔴 v89 v2 卡生成路径**：先按决策树定协议 → 列字段所有者与世界书未来角色池 → 全局字段留根/角色字段进模板 → 选预设实体（2-4 个核心）+ 是否开自动建档 + 迁移声明 → 外层模板只放 `{{entitysections::}}`、分区模板写 sectionTemplate → 同一验证器验证（v2 分支自动启用）→ verify 检查九项实体卡附加门禁（模板/预设/discovery/migration/entitysections/sectionTemplate 越权/uiHints/角色排他/quick 降级）。
+- 生成流程：**`scripts/build/gen_tracker_decl.js` 已弃用，禁止使用**（仍生成简化旧 schema）——按「tracker 协议声明」节标准模板在内存中构造声明；写盘前必须调用公共验证器 `scripts/verify_tracker_v76_v77.js`（入口按 schemaVersion 自动分流 v1/v2）；verify 检查 13 项（声明存在/stateSchema≥3/initialState≥3/actions≥2/uiHints/**每个 number 字段有 ranges≥3**/**每个 number 字段有 updatePolicy+semanticHints（漏一即失败）**/**string 字段双模式：枚举模式（allowCustomValues=false）必须 states≥2+key==title；自由文本模式（allowCustomValues:true/省略）不强制 states**/模板含 `{{gettitle::`/**presentation 字段的面板行含 getcolor+getnarrative**/**v68：`<!--/panel-->` 结束标记存在且 `tracker.uiHints.order`/`tracker.template` 齐全（面板模板完整性，缺一即失败）**/**v76：semanticHints 必须在 updatePolicy 内（字段顶层即 FAIL）+ 信号必须是数组（字符串即 FAIL）+ string 枚举模式 allowCustomValues=false（枚举字段漏配即 FAIL）+ 枚举模式 states key==title（key≠title 即 FAIL）+ 枚举模式 initialState 值在枚举中 + aliases 非空（漏一即失败）**/**v77：`tracker.template` 以 `<details>` 开头、不含 `<!--panel-->`/指令文本/裸引用（命中即 FAIL）**）。**🔴 v89 v2 卡生成路径**：先按决策树定协议 → 列字段所有者与世界书未来角色池 → 全局字段留根/角色字段进模板 → 选预设实体（2-4 个核心）并逐个标注 **initiallyAppeared**（主角/开场必登场→true，其余→false 等剧情触发）→ 是否开自动建档 + 迁移声明 → 外层模板只放 `{{entitysections::}}`、分区模板写 sectionTemplate → 同一验证器验证（v2 分支自动启用）→ verify 检查九项实体卡附加门禁（模板/预设/discovery/migration/entitysections/sectionTemplate 越权/uiHints/角色排他/quick 降级）。
 - **🔴 verify 追加核对（v63 后强制，逐字段对照，不只是"至少有一个"）**：
   1. **每个 number 字段**：面板行含 `{{getnarrative::<key>}}` 且**不含** `{{gettext::<key>}}`（漏配或误用 gettext 即 FAIL）
   2. **每个 string 字段**：面板行含 `{{gettext::<key>}}`（gettext 仅 string 字段使用）
