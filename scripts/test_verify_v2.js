@@ -115,6 +115,14 @@ expectOk('v2 合法卡通过', clone(), true);
   const c = clone(); c.data.extensions.tracker.schemaVersion = '1.0';
   expectOk('字符串 "1.0" 走 v1（缺根 schema → 失败）', c, false);
 }
+{
+  const c = clone(); c.data.extensions.tracker.initialEntities[0].initiallyAppeared = 'yes';
+  expectOk('initiallyAppeared 非布尔 → 失败', c, false);
+}
+{
+  const c = clone(); c.data.extensions.tracker.initialEntities[0].initiallyAppeared = true;
+  expectOk('initiallyAppeared=true 合法 → 通过', c, true);
+}
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);
